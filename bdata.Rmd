@@ -41,14 +41,24 @@ head(game_log)
 
 All the fields in `game_log` are explained in the `game_log_fields.txt` file.
 
-Columns 44-49 contain the visiting teams' defensive statistics (unquoted) (in order):
+In the game log, each player has a defensive position listed in these columns: 
 
-* putouts. Note: prior to 1931, this may not equal 3 times the number of innings pitched.    Prior to that, no putout was awarded when a runner was declared out for being hit by a     batted ball.
-* assists
-* errors
-* passed balls
-* double plays
-* triple plays
+* 106-132   Visiting starting players ID, name and defensive position,listed in the order (1-9) they appeared in the batting order.
+* 133-159   Home starting players ID, name and defensive position listed in the order (1-9) they appeared in the batting order. 
+
+Doing some research around this, I found this [article] (http://probaseballinsider.com/baseball-instruction/baseball-basics/baseball-basics-positions/) which gives us a list of names for each numbered position:
+
+* Pitcher
+* Catcher
+* 1st Base
+* 2nd Base
+* 3rd Base
+* Shortstop
+* Left Field
+* Center Field
+* Right Field
+
+The 10th position isn't included, it may be a way of describing a designated hitter that does not field. I can find a retrosheet page that indicates that position 0 is used for this, but we don't have any position 0 in our data. I have chosen to make this an 'Unknown Position' so I'm not including data based on a hunch.
 
 This information is repeated in columns 72-77 for the home teams.
 
@@ -112,4 +122,8 @@ dbGetQuery(con, "SELECT COUNT(DISTINCT(game_id)) FROM game_log")
 
 ```
 
+## Normalization
 
+* Within a table, all of the columns should be related, or be an attribute, to the primary key. Any columns that are not an attribute to the primary key are better placed in their own tables. The primary key of our game log is `game_id`, but the players' names are not attributes of a game, but of the player ID. If the only data we had was the game log, we would remove this column and create a new table that had the names of each player. As it happens, our `person_codes` table already has a list of our player IDs and names, so we can remove these without the need for creating a new table first.
+
+* Lastly, we want to eliminate any redundant data is available elsewhere. This second example can be found in the park_codes table.The start and end columns indicate the dates for the first and last games played at the park. This information can also be derived by looking at the park information for each game, so we might want to remove these columns from this table.
