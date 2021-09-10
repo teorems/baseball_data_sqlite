@@ -1,0 +1,115 @@
+---
+title: "baseball_data"
+author: "Emmanuel Messori"
+date: "09/09/2021"
+output: 
+  html_document:
+    theme:
+      bootswatch: darkly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+We will work with data from Major League Baseball games compiled by Retrosheet, a non-profit organization that's gathered game statistics going back to the 1800s to today. The main file we will work from is game_log.csv, which has been compiled and pre-cleaned from 127 separate CSV files from Retrosheet. This file has hundreds of data points on each game. The goal of this lesson is to convert and normalize this data into several separate tables using SQL and create a robust database of game-level statistics.
+
+
+## Reading the data
+
+```{r}
+library(tidyverse)
+game_log <- read_csv("baseball_data/game_log.csv")
+park_codes <-read_csv("baseball_data/park_codes.csv")
+person_codes <- read_csv("baseball_data/person_codes.csv")
+team_codes <- read.csv("baseball_data/team_codes.csv")
+```
+
+
+```{r}
+head(game_log)
+```
+
+* `game_log` is the main file of our database. It contains information about 171907 baseball matche encoded in 161 variables : date, place, game statistics, players information.
+
+* `park_codes` adds info pertaining the baseball grounds.
+
+* `person_code` contains info about the players. It joins with the  `game_log` filt through the `id` variable.
+
+* `team_codes` contains information about the baseball teams.
+
+All the fields in `game_log` are explained in the `game_log_fields.txt` file.
+
+Columns 44-49 contain the visiting teams' defensive statistics (unquoted) (in order):
+
+* putouts. Note: prior to 1931, this may not equal 3 times the number of innings pitched.    Prior to that, no putout was awarded when a runner was declared out for being hit by a     batted ball.
+* assists
+* errors
+* passed balls
+* double plays
+* triple plays
+
+This information is repeated in columns 72-77 for the home teams.
+
+The fields 5 and 8 contain information about the historical leagues which existed at the time (prior to the current MLB):
+
+```{r}
+unique(game_log$h_league)
+```
+> All of the (candidate) major leagues in baseball have standardized two-letter              abbreviations such as NA — namely, NA, NL, AA, UA, PL, AL, FL — whose crucial value is in   this encyclopedic context.
+>
+[fandom](https://baseball.fandom.com/wiki/National_Association_as_a_major_league#:~:text=All%20of%20the%20%28candidate%29%20major%20leagues%20in%20baseball,encyclopedic%20context.%20To%20count%20or%20not%20to%20count)
+
+* **NL** National League
+* **AL** American League
+* **UA** Union Association
+* **AA** American Association
+* **PL** Player's League
+* **FL** Federal League
+* **NA** here is probably not a missing value but the National Association.
+
+## Tables
+
+```{r}
+library(DBI)
+library(RSQLite)
+# 
+con <- dbConnect(RSQLite::SQLite(), "mlb.db")
+# 
+# dbWriteTable(conn = con, name = "game_log", value = game_log,
+#              row.names = FALSE, header = TRUE)
+# 
+# dbWriteTable(conn = con, name = "park_codes", value = park_codes,
+#              row.names = FALSE, header = TRUE)
+# 
+# dbWriteTable(conn = con, name = "person_codes", value = person_codes,
+#              row.names = FALSE, header = TRUE)
+# 
+# dbWriteTable(conn = con, name = "team_codes", value = team_codes,
+#              row.names = FALSE, header = TRUE)
+```
+
+Since we do not have it yet, we will create a compound primary key for the game_log table using the `h_name`, `date` and `number` of game field.
+
+```{r}
+drop <- 'ALTER TABLE game_log
+DROP COLUMN game_id;'
+
+dbExecute(con, drop)
+
+new_c <- 'ALTER TABLE game_log
+ADD COLUMN game_id TEXT;'
+
+dbExecute(con, new_c)
+
+data<- 'UPDATE game_log SET game_id = h_name || date || number_of_game
+WHERE game_id IS NULL'
+
+dbExecute(con, data)
+
+dbGetQuery(con, "SELECT COUNT(DISTINCT(game_id)) FROM game_log")
+
+```
+
+
